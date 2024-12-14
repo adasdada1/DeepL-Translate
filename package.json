@@ -1,9 +1,10 @@
 {
   "name": "server_deepl",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "main": "",
   "scripts": {
-    "start": "nodemon index.mjs"
+    "start": "nodemon api/translate.js"
   },
   "keywords": [],
   "author": "",

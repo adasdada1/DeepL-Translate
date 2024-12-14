@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import deepl from "deepl-node";
+
 dotenv.config();
 
 const app = express();
@@ -9,7 +10,6 @@ app.use(cors());
 app.use(express.json());
 
 const API_KEY = process.env.API_KEY;
-
 const translator = new deepl.Translator(API_KEY);
 
 const cache = new Map();
@@ -54,7 +54,7 @@ async function getTranslation(req, res) {
         return translatedTexts;
       }
     });
-    console.log(cache);
+
     const results = await Promise.allSettled(promises);
     const translatedTexts = results.map((result) => {
       if (result.status === "fulfilled") {
@@ -82,6 +82,4 @@ app.get("/", (req, res) => {
 
 app.post("/translate", getTranslation);
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
-});
+export default app;
