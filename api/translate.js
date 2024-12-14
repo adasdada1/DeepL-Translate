@@ -76,10 +76,6 @@ async function getTranslation(req, res) {
   }
 }
 
-app.get("/", (req, res) => {
-  res.send("Welcome");
-});
-
-app.post("/translate", getTranslation);
-
-export default app;
+export default (req, res) => {
+  app(req, res);
+};
