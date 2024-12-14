@@ -36,7 +36,8 @@ async function getTranslation(req, res) {
         console.log("in cache");
         return cache.get(cacheKey);
       } else {
-        console.log("not in cache");
+        console.log("not in cache",cacheKey);
+        console.log(cache);
         const review = reviews[index];
         const textsToTranslate = [
           review.author ? review.author : "-1-1-1-",
