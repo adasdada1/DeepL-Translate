@@ -2,9 +2,9 @@
   "name": "server_deepl",
   "version": "1.0.0",
   "type": "module",
-  "main": "api/translate.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node api/translate.js"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
