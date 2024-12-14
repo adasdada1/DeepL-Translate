@@ -76,6 +76,10 @@ async function getTranslation(req, res) {
   }
 }
 
+app.get("/", (req, res) => {
+  res.send("Welcome");
+});
+
 app.post("/translate", getTranslation);
 
 app.listen(3000, () => {
