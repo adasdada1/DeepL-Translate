@@ -76,10 +76,4 @@ async function getTranslation(req, res) {
   }
 }
 
-app.get("/", (req, res) => {
-  res.send("Welcome");
-});
-
-app.post("/translate", getTranslation);
-
-export default app;
+app.listen(3000, () => console.log("Port 3000"));
