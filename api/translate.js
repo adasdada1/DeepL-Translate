@@ -1,7 +1,7 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import deepl from "deepl-node";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import deepl from 'deepl-node';
 
 dotenv.config();
 
@@ -76,6 +76,10 @@ async function getTranslation(req, res) {
   }
 }
 
-export default (req, res) => {
-  app(req, res);
-};
+export default function handler(req, res) {
+  if (req.method === 'POST') {
+    getTranslation(req, res);
+  } else {
+    res.status(405).json({ error: 'Method Not Allowed' });
+  }
+}
