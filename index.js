@@ -76,4 +76,12 @@ async function getTranslation(req, res) {
   }
 }
 
-app.listen(3000, () => console.log("Port 3000"));
+app.get("/", (req, res) => {
+  res.send("Welcome");
+});
+
+app.post("/translate", getTranslation);
+
+app.listen(3000, () => {
+  console.log("Server is running on port 3000");
+});
