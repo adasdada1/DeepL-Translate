@@ -34,7 +34,7 @@ async function getTranslation(req, res) {
     const promises = keysWithLang.map(async (cacheKey, index) => {
       if (cache.has(cacheKey)) {
         console.log("in cache");
-        return cache.get(cacheKey+1);
+        return cache.get(cacheKey);
       } else {
         console.log("not in cache");
         const review = reviews[index];
