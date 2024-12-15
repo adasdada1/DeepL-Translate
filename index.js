@@ -7,7 +7,23 @@ import Redis from "ioredis";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+const allowedOrigins = [
+  "https://www.doscosmetics.com",
+  "https://www.doscosmetics.gr",
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const API_KEY = process.env.API_KEY;
@@ -22,43 +38,58 @@ async function getTranslation(req, res) {
     return res.status(400).json({ error: "Missing review or targetLang" });
   }
 
-  const keysWithLang = reviews.map((key) => `${key.text}-${targetLang}`);
+  const keysWithLang = reviews.map((review) => `${review.text}-${targetLang}`);
+  const missingCacheKeys = [];
+
   try {
-    const promises = keysWithLang.map(async (cacheKey, index) => {
-      const cachedTranslation = await redis.get(cacheKey);
+    const cachedTranslations = await redis.mget(keysWithLang);
+    const translatedTextsPromises = keysWithLang.map((cacheKey, index) => {
+      const cachedTranslation = cachedTranslations[index];
       if (cachedTranslation) {
         console.log("in Redis' cache");
         return JSON.parse(cachedTranslation);
       } else {
         console.log("not in cache", cacheKey);
-        const review = reviews[index];
-        const textsToTranslate = [
-          review.author ? review.author : "-1-1-1-",
-          review.title ? review.title : "-1-1-1-",
-          review.text ? review.text : "-1-1-1-",
-        ];
-
-        const result = await translator.translateText(
-          textsToTranslate,
-          null,
-          targetLang
-        );
-        const translatedTexts = result.map((item) =>
-          item.text === "-1-1-1-" ? "" : item.text
-        );
-
-        await redis.set(cacheKey, JSON.stringify(translatedTexts));
-
-        return translatedTexts;
+        missingCacheKeys.push(index);
+        return null;
       }
     });
 
-    const results = await Promise.all(promises);
-    const translatedTexts = results.map((result) => ({
-      author: result[0],
-      title: result[1],
-      text: result[2],
-    }));
+    const textsToTranslate = missingCacheKeys.map((index) => {
+      const review = reviews[index];
+      return [
+        review.author || "-1-1-1-",
+        review.title || "-1-1-1-",
+        review.text || "-1-1-1-",
+      ];
+    });
+
+    const translatedResults = await Promise.all(
+      textsToTranslate.map((texts) =>
+        translator.translateText(texts, null, targetLang)
+      )
+    );
+
+    missingCacheKeys.forEach((index, i) => {
+      const translatedTexts = translatedResults[i].map((item) =>
+        item.text === "-1-1-1-" ? "" : item.text
+      );
+      redis.set(cacheKey, JSON.stringify(translatedTexts));
+    });
+
+    const translatedTexts = translatedTextsPromises.map((result, index) => {
+      if (result) {
+        return { author: result[0], title: result[1], text: result[2] };
+      } else {
+        const newTranslated =
+          translatedResults[missingCacheKeys.indexOf(index)];
+        return {
+          author: newTranslated[0],
+          title: newTranslated[1],
+          text: newTranslated[2],
+        };
+      }
+    });
 
     res.json({ translatedTexts });
   } catch (error) {
