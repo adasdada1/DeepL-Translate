@@ -23,8 +23,8 @@ const corsOptions = {
   },
 };
 
-app.use(cors(corsOptions));
 app.use(express.json());
+app.use(cors(corsOptions));
 
 const API_KEY = process.env.API_KEY;
 const translator = new deepl.Translator(API_KEY);
@@ -74,6 +74,7 @@ async function getTranslation(req, res) {
       const translatedTexts = translatedResults[i].map((item) =>
         item.text === "-1-1-1-" ? "" : item.text
       );
+      const cacheKey = keysWithLang[index];
       redis.set(cacheKey, JSON.stringify(translatedTexts));
     });
 
@@ -81,8 +82,11 @@ async function getTranslation(req, res) {
       if (result) {
         return { author: result[0], title: result[1], text: result[2] };
       } else {
-        const newTranslated =
-          translatedResults[missingCacheKeys.indexOf(index)];
+        const missingIndex = missingCacheKeys.indexOf(index);
+        if (missingIndex === -1) {
+          return { author: "", title: "", text: "" };
+        }
+        const newTranslated = translatedResults[missingIndex];
         return {
           author: newTranslated[0],
           title: newTranslated[1],
@@ -97,14 +101,6 @@ async function getTranslation(req, res) {
     res.status(500).json({ error: "Translation failed" });
   }
 }
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return res.status(403).json({ error: "Not allowed by CORS" });
-  }
-  next();
-});
 
 app.get("/", (req, res) => {
   res.send("Welcome");
