@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import deepl from "deepl-node";
+import Redis from "ioredis";
 
 dotenv.config();
 
@@ -12,32 +13,24 @@ app.use(express.json());
 const API_KEY = process.env.API_KEY;
 const translator = new deepl.Translator(API_KEY);
 
-const cache = new Map();
-const MAX_CACHE_SIZE = 300;
-
-function addToCache(key, value) {
-  if (cache.size >= MAX_CACHE_SIZE && cache.size > 0) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
-  }
-  cache.set(key, value);
-}
+const REDIS_API = process.env.REDIS;
+const redis = new Redis(REDIS_API);
 
 async function getTranslation(req, res) {
   const { reviews, targetLang } = req.body;
   if (!reviews || !targetLang) {
-    return res.status(400).json({ error: "Missing review" });
+    return res.status(400).json({ error: "Missing review or targetLang" });
   }
 
   const keysWithLang = reviews.map((key) => `${key.text}-${targetLang}`);
   try {
     const promises = keysWithLang.map(async (cacheKey, index) => {
-      if (cache.has(cacheKey)) {
-        console.log("in cache");
-        return cache.get(cacheKey);
+      const cachedTranslation = await redis.get(cacheKey);
+      if (cachedTranslation) {
+        console.log("in Redis' cache");
+        return JSON.parse(cachedTranslation);
       } else {
-        console.log("not in cache",cacheKey);
-        console.log(cache);
+        console.log("not in cache", cacheKey);
         const review = reviews[index];
         const textsToTranslate = [
           review.author ? review.author : "-1-1-1-",
@@ -53,24 +46,19 @@ async function getTranslation(req, res) {
         const translatedTexts = result.map((item) =>
           item.text === "-1-1-1-" ? "" : item.text
         );
-        addToCache(cacheKey, translatedTexts);
+
+        await redis.set(cacheKey, JSON.stringify(translatedTexts));
+
         return translatedTexts;
       }
     });
 
-    const results = await Promise.allSettled(promises);
-    const translatedTexts = results.map((result) => {
-      if (result.status === "fulfilled") {
-        return {
-          author: result.value[0],
-          title: result.value[1],
-          text: result.value[2],
-        };
-      } else {
-        console.error("Translation failed:", result.reason);
-        return "Error";
-      }
-    });
+    const results = await Promise.all(promises);
+    const translatedTexts = results.map((result) => ({
+      author: result[0],
+      title: result[1],
+      text: result[2],
+    }));
 
     res.json({ translatedTexts });
   } catch (error) {
