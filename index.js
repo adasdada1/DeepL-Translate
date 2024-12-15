@@ -98,6 +98,14 @@ async function getTranslation(req, res) {
   }
 }
 
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ error: "Not allowed by CORS" });
+  }
+  next();
+});
+
 app.get("/", (req, res) => {
   res.send("Welcome");
 });
