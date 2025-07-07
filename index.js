@@ -242,6 +242,47 @@ app.post('/fb-generic-event', async (req, res) => {
   }
 });
 
+app.post('/fb-search', async (req, res) => {
+  try {
+    const {
+      event_id,
+      user_data,
+      custom_data
+    } = req.body;
+
+    if (user_data.em) {
+      user_data.em = crypto.createHash('sha256').update(user_data.em.toLowerCase()).digest('hex');
+    }
+
+    const eventData = {
+      event_name: 'Search',
+      event_time: Math.floor(Date.now() / 1000),
+      event_id: event_id,
+      event_source_url: req.body.event_source_url,
+      action_source: 'website',
+      user_data: user_data,
+      custom_data: {
+        search_string: custom_data.search_string
+      }
+    };
+    
+    // ... (дальнейший код отправки в CAPI точно такой же, как в примере /fb-generic-event)
+    const response = await fetch(`https://graph.facebook.com/v19.0/${YOUR_PIXEL_ID}/events?access_token=${YOUR_ACCESS_TOKEN}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [eventData] })
+    });
+    // ... (обработка ответа)
+
+    res.status(200).json({ success: true, message: 'Search event received' });
+
+  } catch (error) {
+    console.error('CAPI Search Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
