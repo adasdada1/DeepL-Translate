@@ -13,7 +13,7 @@ const app = express();
 const allowedOrigins = [
   "https://www.doscosmetics.com",
   "https://www.doscosmetics.gr",
-  "https://deep-l-translate.vercel.app"
+  "https://deep-l-translate.vercel.app",
 ];
 
 const corsOptions = {
@@ -116,6 +116,8 @@ app.post("/fb-add-to-cart", async (req, res) => {
       event_name,
       event_time,
       event_id,
+      event_source_url, // НОВОЕ
+      action_source, // НОВОЕ
       content_ids,
       content_name,
       value,
@@ -123,34 +125,45 @@ app.post("/fb-add-to-cart", async (req, res) => {
       user_email,
       user_ip,
       user_agent,
+      fbp, // НОВОЕ
+      fbc, // НОВОЕ
     } = req.body;
 
-    // Build user_data with optional hashing
-    const user_data = {};
+    // Определяем IP на сервере — это надежнее
+    const client_ip_address =
+      req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+
+    // Собираем данные о пользователе
+    const user_data = {
+      client_ip_address,
+      client_user_agent: user_agent,
+    };
     if (user_email) {
       user_data.em = sha256(user_email.trim().toLowerCase());
     }
-    if (user_ip) {
-      user_data.client_ip_address = user_ip;
+    if (fbp) {
+      user_data.fbp = fbp;
     }
-    if (user_agent) {
-      user_data.client_user_agent = user_agent;
+    if (fbc) {
+      user_data.fbc = fbc;
     }
 
-    // Prepare payload
+    // Готовим тело запроса для Facebook
     const payload = {
       data: [
         {
           event_name,
           event_time,
           event_id,
-          user_data,
+          event_source_url,
+          action_source,
+          user_data, // Отправляем собранный объект с данными пользователя
           custom_data: { content_ids, content_name, value, currency },
         },
       ],
     };
 
-    // Send to Meta Conversions API
+    // Отправляем в Meta Conversions API
     const url = `https://graph.facebook.com/v15.0/${process.env.PIXEL_ID}/events`;
     const response = await axios.post(url, payload, {
       params: { access_token: process.env.ACCESS_TOKEN },
