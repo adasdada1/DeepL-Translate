@@ -110,8 +110,6 @@ async function getTranslation(req, res) {
   }
 }
 
-
-
 app.get("/", (req, res) => {
   res.send("Welcome");
 });
@@ -187,7 +185,7 @@ app.post("/fb-add-to-cart", async (req, res) => {
   }
 });
 
-app.post('/fb-generic-event', async (req, res) => {
+app.post("/fb-generic-event", async (req, res) => {
   try {
     const {
       event_name,
@@ -196,19 +194,22 @@ app.post('/fb-generic-event', async (req, res) => {
       event_source_url,
       action_source,
       user_data,
-      custom_data
+      custom_data,
     } = req.body;
 
     // Проверка наличия обязательных полей
     if (!event_name || !event_time || !event_id) {
-      return res.status(400).send('Missing required event parameters.');
+      return res.status(400).send("Missing required event parameters.");
     }
 
     // Хешируем email, если он есть. Facebook требует SHA256.
     if (user_data.em) {
-      user_data.em = crypto.createHash('sha256').update(user_data.em.toLowerCase()).digest('hex');
+      user_data.em = crypto
+        .createHash("sha256")
+        .update(user_data.em.toLowerCase())
+        .digest("hex");
     }
-    
+
     const eventData = {
       event_name: event_name,
       event_time: event_time,
@@ -216,72 +217,76 @@ app.post('/fb-generic-event', async (req, res) => {
       event_source_url: event_source_url,
       action_source: action_source,
       user_data: user_data,
-      custom_data: custom_data
+      custom_data: custom_data,
     };
 
-    const response = await fetch(`https://graph.facebook.com/v23.0/${process.env.PIXEL_ID}/events?access_token=${process.env.ACCESS_TOKEN}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [eventData],
-      })
-    });
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${process.env.PIXEL_ID}/events?access_token=${process.env.ACCESS_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: [eventData],
+        }),
+      }
+    );
 
     const responseData = await response.json();
-    console.log('CAPI Response for ' + event_name + ':', responseData);
+    console.log("CAPI Response for " + event_name + ":", responseData);
 
     if (!response.ok) {
-      throw new Error('Facebook CAPI request failed.');
+      throw new Error("Facebook CAPI request failed.");
     }
 
-    res.status(200).json({ success: true, message: `Event ${event_name} received` });
-
+    res
+      .status(200)
+      .json({ success: true, message: `Event ${event_name} received` });
   } catch (error) {
-    console.error('CAPI Error:', error);
+    console.error("CAPI Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post('/fb-search', async (req, res) => {
+app.post("/fb-search", async (req, res) => {
   try {
-    const {
-      event_id,
-      user_data,
-      custom_data
-    } = req.body;
+    const { event_id, user_data, custom_data } = req.body;
 
     if (user_data.em) {
-      user_data.em = crypto.createHash('sha256').update(user_data.em.toLowerCase()).digest('hex');
+      user_data.em = crypto
+        .createHash("sha256")
+        .update(user_data.em.toLowerCase())
+        .digest("hex");
     }
 
     const eventData = {
-      event_name: 'Search',
+      event_name: "Search",
       event_time: Math.floor(Date.now() / 1000),
       event_id: event_id,
       event_source_url: req.body.event_source_url,
-      action_source: 'website',
+      action_source: "website",
       user_data: user_data,
       custom_data: {
-        search_string: custom_data.search_string
-      }
+        search_string: custom_data.search_string,
+      },
     };
-    
+
     // ... (дальнейший код отправки в CAPI точно такой же, как в примере /fb-generic-event)
-    const response = await fetch(`https://graph.facebook.com/v19.0/${YOUR_PIXEL_ID}/events?access_token=${YOUR_ACCESS_TOKEN}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: [eventData] })
-    });
+    const response = await fetch(
+      `https://graph.facebook.com/v23.0/${process.env.PIXEL_ID}/events?access_token=${process.env.ACCESS_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: [eventData] }),
+      }
+    );
     // ... (обработка ответа)
 
-    res.status(200).json({ success: true, message: 'Search event received' });
-
+    res.status(200).json({ success: true, message: "Search event received" });
   } catch (error) {
-    console.error('CAPI Search Error:', error);
+    console.error("CAPI Search Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
-
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
