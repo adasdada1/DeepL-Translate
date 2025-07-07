@@ -110,6 +110,14 @@ async function getTranslation(req, res) {
   }
 }
 
+
+
+app.get("/", (req, res) => {
+  res.send("Welcome");
+});
+
+app.post("/translate", getTranslation);
+
 app.post("/fb-add-to-cart", async (req, res) => {
   try {
     const {
@@ -164,7 +172,7 @@ app.post("/fb-add-to-cart", async (req, res) => {
     };
 
     // Отправляем в Meta Conversions API
-    const url = `https://graph.facebook.com/v15.0/${process.env.PIXEL_ID}/events`;
+    const url = `https://graph.facebook.com/v23.0/${process.env.PIXEL_ID}/events`;
     const response = await axios.post(url, payload, {
       params: { access_token: process.env.ACCESS_TOKEN },
     });
@@ -179,11 +187,60 @@ app.post("/fb-add-to-cart", async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("Welcome");
-});
+app.post('/fb-generic-event', async (req, res) => {
+  try {
+    const {
+      event_name,
+      event_time,
+      event_id,
+      event_source_url,
+      action_source,
+      user_data,
+      custom_data
+    } = req.body;
 
-app.post("/translate", getTranslation);
+    // Проверка наличия обязательных полей
+    if (!event_name || !event_time || !event_id) {
+      return res.status(400).send('Missing required event parameters.');
+    }
+
+    // Хешируем email, если он есть. Facebook требует SHA256.
+    if (user_data.em) {
+      user_data.em = crypto.createHash('sha256').update(user_data.em.toLowerCase()).digest('hex');
+    }
+    
+    const eventData = {
+      event_name: event_name,
+      event_time: event_time,
+      event_id: event_id,
+      event_source_url: event_source_url,
+      action_source: action_source,
+      user_data: user_data,
+      custom_data: custom_data
+    };
+
+    const response = await fetch(`https://graph.facebook.com/v23.0/${process.env.PIXEL_ID}/events?access_token=${process.env.ACCESS_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [eventData],
+      })
+    });
+
+    const responseData = await response.json();
+    console.log('CAPI Response for ' + event_name + ':', responseData);
+
+    if (!response.ok) {
+      throw new Error('Facebook CAPI request failed.');
+    }
+
+    res.status(200).json({ success: true, message: `Event ${event_name} received` });
+
+  } catch (error) {
+    console.error('CAPI Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
