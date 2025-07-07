@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import deepl from "deepl-node";
 import Redis from "ioredis";
+import axios from "axios";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -11,6 +13,7 @@ const app = express();
 const allowedOrigins = [
   "https://www.doscosmetics.com",
   "https://www.doscosmetics.gr",
+  "https://deep-l-translate.vercel.app"
 ];
 
 const corsOptions = {
@@ -31,6 +34,11 @@ const translator = new deepl.Translator(API_KEY);
 
 const REDIS_API = process.env.REDIS;
 const redis = new Redis(REDIS_API);
+
+// Helper: SHA256 hashing for user_data
+function sha256(str) {
+  return crypto.createHash("sha256").update(str).digest("hex");
+}
 
 async function getTranslation(req, res) {
   const { reviews, targetLang } = req.body;
@@ -101,6 +109,62 @@ async function getTranslation(req, res) {
     res.status(500).json({ error: "Translation failed" });
   }
 }
+
+app.post("/fb-add-to-cart", async (req, res) => {
+  try {
+    const {
+      event_name,
+      event_time,
+      event_id,
+      content_ids,
+      content_name,
+      value,
+      currency,
+      user_email,
+      user_ip,
+      user_agent,
+    } = req.body;
+
+    // Build user_data with optional hashing
+    const user_data = {};
+    if (user_email) {
+      user_data.em = sha256(user_email.trim().toLowerCase());
+    }
+    if (user_ip) {
+      user_data.client_ip_address = user_ip;
+    }
+    if (user_agent) {
+      user_data.client_user_agent = user_agent;
+    }
+
+    // Prepare payload
+    const payload = {
+      data: [
+        {
+          event_name,
+          event_time,
+          event_id,
+          user_data,
+          custom_data: { content_ids, content_name, value, currency },
+        },
+      ],
+    };
+
+    // Send to Meta Conversions API
+    const url = `https://graph.facebook.com/v15.0/${process.env.PIXEL_ID}/events`;
+    const response = await axios.post(url, payload, {
+      params: { access_token: process.env.ACCESS_TOKEN },
+    });
+
+    console.log("FB CAPI response:", response.data);
+    res.json({ success: true, result: response.data });
+  } catch (error) {
+    console.error("FB CAPI error:", error.response?.data || error.message);
+    res
+      .status(500)
+      .json({ success: false, error: error.response?.data || error.message });
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("Welcome");
